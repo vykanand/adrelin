@@ -20,8 +20,9 @@ RUN apt-get update && apt-get install -y \
     chromium \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user
-RUN groupadd -r node && useradd -r -g node node
+# Create node user and group if they don't exist
+RUN if ! getent group node > /dev/null; then groupadd -r node; fi && \
+    if ! id -u node > /dev/null 2>&1; then useradd -r -g node node; fi
 
 # Copy package files
 COPY package*.json ./
