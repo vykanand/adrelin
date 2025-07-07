@@ -46,4 +46,4 @@ COPY --from=builder /app .
 
 # Expose port and start the application
 EXPOSE 3000
-CMD ["node", "client.js"]
+CMD ["node", "server.js"]
