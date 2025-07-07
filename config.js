@@ -12,8 +12,11 @@ module.exports = {
     LAUNCH_OPTIONS: {
         headless: true,
         args: [
-            '--start-maximized',
-            '--disable-web-security'
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--window-size=1280x720'
         ]
     },
     
