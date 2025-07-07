@@ -20,6 +20,9 @@ RUN apt-get update && apt-get install -y \
     chromium \
     && rm -rf /var/lib/apt/lists/*
 
+# Create a non-root user
+RUN groupadd -r node && useradd -r -g node node
+
 # Copy package files
 COPY package*.json ./
 
@@ -28,6 +31,12 @@ RUN npm ci
 
 # Copy application code
 COPY . .
+
+# Change ownership of the app directory
+RUN chown -R node:node /app
+
+# Switch to non-root user
+USER node
 
 # Expose port 3000
 EXPOSE 3000
