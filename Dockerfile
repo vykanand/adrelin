@@ -46,4 +46,4 @@ COPY --from=builder /app .
 
 # Expose port and start the application
 EXPOSE 3000
-CMD ["node", "/app/node_modules/nodemon/bin/nodemon.js", "server.js"]
+CMD ["node", "client.js"]
