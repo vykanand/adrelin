@@ -1,16 +1,5 @@
-const puppeteer = require('puppeteer');
-const config = require('./config');
-const { signInAdrenalin, signOutAdrenalin, isDuringWorkingHours } = require('./auth');
+const { signInAdrenalin, signOutAdrenalin, isDuringWorkingHours, getRandomTimeWithinWindow } = require('./auth');
 const schedule = require('node-schedule');
-
-// Helper function to generate random time between 9 AM and 6 PM
-// Helper function to generate random time within 20 minutes window
-function getRandomTimeWithinWindow(baseTime, windowMinutes = 20) {
-    const now = new Date(baseTime);
-    const randomMinutes = Math.floor(Math.random() * windowMinutes);
-    now.setMinutes(now.getMinutes() + randomMinutes);
-    return now;
-}
 
 // Main server function
 async function startServer() {
@@ -25,10 +14,9 @@ async function startServer() {
             try {
                 console.log('🔑 Starting daily sign-in process...');
                 
-                // Wait until random time between 9:00-9:30 AM
+                // Get current time and calculate random sign-in time
                 const now = new Date();
-                const signInTime = new Date(now);
-                signInTime.setHours(9, Math.floor(Math.random() * 30), 0, 0); // Random minute between 0-29
+                const signInTime = getRandomTimeWithinWindow(now, 30); // Random minute between 0-29
                 
                 const timeUntilSignIn = signInTime - now;
                 if (timeUntilSignIn > 0) {
@@ -37,16 +25,15 @@ async function startServer() {
                 }
 
                 console.log(`⏰ Starting sign-in at: ${signInTime.toLocaleTimeString()}`);
-                const result = await signInAdrenalin();
+                const signInResult = await signInAdrenalin();
                 
-                if (result.success) {
+                if (signInResult.success) {
                     // Schedule sign-out between 5:00-6:00 PM (Monday to Friday)
                     schedule.scheduleJob('0 17 * * 1-5', async () => {
                         try {
-                            // Wait until random time between 5:00-6:00 PM
+                            // Get current time and calculate random sign-out time
                             const now = new Date();
-                            const signOutTime = new Date(now);
-                            signOutTime.setHours(17, Math.floor(Math.random() * 60), 0, 0); // Random minute between 0-59
+                            const signOutTime = getRandomTimeWithinWindow(now, 60); // Random minute between 0-59
                             
                             const timeUntilSignOut = signOutTime - now;
                             if (timeUntilSignOut > 0) {
@@ -55,11 +42,18 @@ async function startServer() {
                             }
 
                             console.log(`⏰ Starting sign-out at: ${signOutTime.toLocaleTimeString()}`);
-                            await signOutAdrenalin(result.browser, result.page);
+                            const signOutResult = await signOutAdrenalin();
+                            if (signOutResult.success) {
+                                console.log('✅ Successfully signed out');
+                            } else {
+                                console.error('❌ Sign-out failed:', signOutResult.error);
+                            }
                         } catch (error) {
                             console.error('❌ Error in daily sign-out:', error);
                         }
                     });
+                } else {
+                    console.error('❌ Sign-in failed:', signInResult.error);
                 }
             } catch (error) {
                 console.error('❌ Error in daily sign-in:', error);
