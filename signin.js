@@ -128,17 +128,5 @@ async function signInAdrenalin() {
   return { browser: null, page: null, loggedIn: true };
 }
 
-// Main execution with error handling
-async function main() {
-  try {
-    console.log('=== SIGN IN ONLY ===');
-    const result = await signInAdrenalin();
-    console.log('✅ Sign in completed:', result);
-  } catch (error) {
-    console.error('❌ Error occurred:', error.message);
-    process.exit(1);
-  }
-}
-
-// Run the script
-main();
+// Export the function directly
+module.exports.signInAdrenalin = signInAdrenalin;

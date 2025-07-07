@@ -31,20 +31,7 @@ async function signInAdrenalin() {
             return { success: false, error: 'Not during working hours' };
         }
 
-        console.log('⏳ Waiting for scheduled time...');
-        const now = new Date();
-        const scheduledTime = getRandomTimeWithinWindow(now);
-        
-        // Wait until scheduled time
-        const timeUntilScheduled = scheduledTime - now;
-        if (timeUntilScheduled > 0) {
-            console.log(`⏳ Waiting ${Math.ceil(timeUntilScheduled / 1000)} seconds until scheduled time...`);
-            await new Promise(resolve => setTimeout(resolve, timeUntilScheduled));
-        }
-
-        console.log('⏰ Scheduled time reached - starting sign-in...');
-        
-        // Using the working signin function
+        console.log('🔑 Starting sign-in process...');
         await signInFunction();
         return { success: true };
     } catch (error) {
@@ -62,42 +49,11 @@ async function signOutAdrenalin() {
             return { success: false, error: 'Not during working hours' };
         }
 
-        console.log('⏳ Waiting for scheduled time...');
-        const now = new Date();
-        const scheduledTime = getRandomTimeWithinWindow(now);
-        
-        // Wait until scheduled time
-        const timeUntilScheduled = scheduledTime - now;
-        if (timeUntilScheduled > 0) {
-            console.log(`⏳ Waiting ${Math.ceil(timeUntilScheduled / 1000)} seconds until scheduled time...`);
-            await new Promise(resolve => setTimeout(resolve, timeUntilScheduled));
-        }
-
-        console.log('⏰ Scheduled time reached - starting sign-out...');
-        
-        // Using the working signout function
+        console.log('🚪 Starting sign-out process...');
         await signOutFunction();
         return { success: true };
-        
-        // Verify signout by checking for login form
-        const signoutSuccess = await page.evaluate(() => {
-            // Check for login form elements
-            const hasLoginForm = document.querySelector('input#txtID') !== null;
-            const hasLoginButton = document.querySelector('input#LocalizedButton1') !== null;
-            
-            return hasLoginForm || hasLoginButton;
-        });
-
-        if (signoutSuccess) {
-            console.log('✅ Signout completed successfully - found login form');
-            return true;
-        } else {
-            console.error('❌ Signout failed - no signout confirmation found');
-            throw new Error('Signout failed');
-        }
-
     } catch (error) {
-        console.error('❌ Error during signout:', error);
+        console.error('❌ Sign-out failed:', error);
         throw error;
     }
 }

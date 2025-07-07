@@ -180,15 +180,5 @@ async function signOutAdrenalin() {
   return { browser: null, page: null, loggedIn: true };
 }
 
-// Main execution with error handling
-async function main() {
-  try {
-    await signOutAdrenalin();
-  } catch (error) {
-    console.error('❌ Error in main:', error);
-    process.exit(1);
-  }
-}
-
-// Run the script
-main();
+// Export the function directly
+module.exports.signOutAdrenalin = signOutAdrenalin;
