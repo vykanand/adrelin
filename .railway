@@ -1,0 +1,11 @@
+[build]
+verbose = true
+
+[deploy]
+verbose = true
+
+[logs]
+level = "debug"
+
+[cache]
+verbose = true
