@@ -10,7 +10,7 @@ module.exports = {
     
     // Browser launch options
     LAUNCH_OPTIONS: {
-        headless: false,
+        headless: true,
         args: [
             '--start-maximized',
             '--disable-web-security'
