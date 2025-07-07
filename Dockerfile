@@ -1,7 +1,10 @@
-FROM node:18-slim
+FROM selenium/standalone-chrome:latest
 
-# Install unzip
-RUN apt-get update && apt-get install -y unzip
+# Install Node.js and npm
+RUN apt-get update && apt-get install -y curl && \
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/*
 
 # Create and set working directory
 WORKDIR /app
@@ -9,18 +12,8 @@ WORKDIR /app
 # Copy application code
 COPY . .
 
-# Extract node_modules.zip with force flag
-RUN unzip -o -q node_modules.zip && rm node_modules.zip
-
-# Extract Puppeteer package (supports both zip and tgz)
-RUN if [ -f "puppeteer-21.5.2.zip" ]; then \
-    unzip -o -q puppeteer-21.5.2.zip && rm puppeteer-21.5.2.zip; \
-  elif [ -f "puppeteer-21.5.2.tgz" ]; then \
-    tar -xzf puppeteer-21.5.2.tgz && rm puppeteer-21.5.2.tgz; \
-  fi
-
-# Set correct permissions
-RUN chmod +x server.js
+# Install dependencies
+RUN npm install
 
 # Expose port and start the application
 EXPOSE 3000
