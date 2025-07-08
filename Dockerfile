@@ -1,27 +1,36 @@
 FROM node:18-slim as builder
 
 # Install Chrome and unzip
-RUN apt-get update && apt-get install -y \
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
-# Copy application and node_modules.zip
+# Copy all application files
 COPY . .
-COPY node_modules.zip .
 
-# Create node_modules directory if it doesn't exist
-RUN mkdir -p node_modules
+# Ensure node_modules is copied correctly
+COPY node_modules ./node_modules
 
-# Unzip pre-downloaded node_modules into node_modules directory
-RUN unzip node_modules.zip -d node_modules
+# Debug: Verify node_modules structure
+RUN echo "=== Verifying node_modules ===" && \
+    echo "1. Check node_modules directory:" && \
+    ls -la node_modules/ && \
+    echo "\n2. Check puppeteer package:" && \
+    ls -la node_modules/puppeteer && \
+    echo "\n3. Check puppeteer package.json:" && \
+    cat node_modules/puppeteer/package.json | grep version
 
-# All dependencies are already in the node_modules.zip
+# Copy application files
+COPY . .
 
 # Build final image
 FROM selenium/standalone-chrome:latest
+
+# Set timezone environment variable
+ENV TZ=Asia/Kolkata
 
 # Set environment variables for Chrome
 ENV CHROME_BIN=/usr/bin/google-chrome
@@ -33,16 +42,20 @@ COPY --from=builder /usr/local /usr/local
 # Set working directory and copy application
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome
-
-# Install remaining packages
-WORKDIR /app
-COPY package.json .
-RUN npm install
 ENV DISPLAY=:99
 
 # Copy application from builder
 WORKDIR /app
-COPY --from=builder /app .
+COPY --from=builder /app/ .
+
+# Debug: Verify node_modules in final image
+RUN echo "=== Verifying node_modules in final image ===" && \
+    echo "1. Check node_modules directory:" && \
+    ls -la node_modules/ && \
+    echo "\n2. Check puppeteer package:" && \
+    ls -la node_modules/puppeteer && \
+    echo "\n3. Check puppeteer package.json:" && \
+    cat node_modules/puppeteer/package.json | grep version
 
 # Expose port and start the application
 EXPOSE 3000

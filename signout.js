@@ -144,7 +144,7 @@ async function signOutAdrenalin() {
       }
     } else {
       console.error('❌ Signout button not found');
-      throw new Error('Signout button not found');
+      await browser.close();
     }
 
     // Wait for signout confirmation
@@ -159,7 +159,6 @@ async function signOutAdrenalin() {
       throw new Error('Signout failed');
     }
 
-    console.log('✅ Browser will now close gracefully');
     console.log('✅ Browser will now close gracefully');
 
     // Close browser gracefully
