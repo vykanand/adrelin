@@ -17,8 +17,7 @@ async function signOutAdrenalin() {
 
     // Wait for page to be fully loaded and theme to be applied
     await page.waitForFunction(() => {
-      return document.readyState === 'complete' && 
-             document.querySelector('html').style.opacity === '1';
+      return document.readyState === 'complete' && document.querySelector('html').style.opacity === '1';
     }, { timeout: config.TIMEOUTS.ELEMENT_WAIT });
 
     // Set company field
@@ -79,73 +78,69 @@ async function signOutAdrenalin() {
 
     console.log(`✅ Login succeeded - found user name: ${userNameText}`);
 
-    // Wait for any post-login actions
-    await page.waitForTimeout(2000);
-
-    // Wait for any post-login actions
-    await page.waitForTimeout(2000);
-
-    console.log('✅ Starting signout process...');
-
-    // Find and click the signout button
-    console.log('🔍 Looking for signout button...');
+    // Wait for post-login actions with proper conditions
+    console.log('⏳ Waiting for post-login actions...');
     const signoutButtonSelector = 'button.btn.primary_cstm_btn.btn-primary.btn-sm.green_color.mr-2.ng-star-inserted';
-    await page.waitForSelector(signoutButtonSelector, { timeout: config.TIMEOUTS.ELEMENT_WAIT });
-    console.log(`✅ Found signout button with selector: ${signoutButtonSelector}`);
+    const maxRetries = 3;
+    let retryCount = 0;
+    let buttonClicked = false;
 
-    // Verify signout button exists
-    console.log('🔍 Verifying signout button exists...');
-    const signoutButtonExists = await page.evaluate((selector) => {
-      const button = document.querySelector(selector);
-      return button !== null;
-    }, signoutButtonSelector);
-
-    if (signoutButtonExists) {
-      console.log('✅ Signout button found successfully');
-      
-      // Click signout button
-      console.log('🚀 Clicking signout button...');
-      await page.evaluate((selector) => {
-        const button = document.querySelector(selector);
-        if (button) {
-          button.click();
-        }
-      }, signoutButtonSelector);
-
-      // Wait for any post-signout actions
-      await page.waitForTimeout(3000);
-
-      // Find and click the SweetAlert2 OK button
-      console.log('🔍 Looking for SweetAlert2 OK button...');
-      const okButtonSelector = '.swal2-confirm.swal2-styled';
+    while (retryCount < maxRetries && !buttonClicked) {
       try {
-        await page.waitForSelector(okButtonSelector, { timeout: config.TIMEOUTS.ELEMENT_WAIT });
-        console.log(`✅ Found OK button with selector: ${okButtonSelector}`);
-        
-        // Click the OK button
-        console.log('🚀 Clicking OK button...');
+        // Wait for the button to be clickable
+        await page.waitForSelector(signoutButtonSelector, {
+          timeout: config.TIMEOUTS.ELEMENT_WAIT,
+          visible: true,
+          state: 'attached'
+        });
+
+        console.log(`✅ Found signout button with selector: ${signoutButtonSelector}`);
+
+        // Verify button is clickable
+        const isClickable = await page.evaluate((selector) => {
+          const button = document.querySelector(selector);
+          if (!button) return false;
+          // Check if button is visible and enabled
+          return !button.disabled && window.getComputedStyle(button).display !== 'none';
+        }, signoutButtonSelector);
+
+        if (!isClickable) {
+          throw new Error('Button is not clickable');
+        }
+
+        // Click the button
+        console.log('🚀 Clicking signout button...');
         await page.evaluate((selector) => {
           const button = document.querySelector(selector);
           if (button) {
             button.click();
           }
-        }, okButtonSelector);
-        
-        // Wait for navigation after OK click
-        console.log('⏳ Waiting for navigation after OK click...');
-        await page.waitForNavigation({ waitUntil: 'networkidle0', timeout: config.TIMEOUTS.NAVIGATION });
-        
-        // If we got here, we've successfully navigated to a new page
-        console.log('✅ Successfully navigated to new page - signout successful');
-        return true;
+        }, signoutButtonSelector);
+
+        // Wait for the click to take effect
+        await page.waitForTimeout(1000);
+        buttonClicked = true;
+
+        console.log('✅ Successfully clicked signout button');
+
       } catch (error) {
-        console.error('❌ Error during OK button interaction:', error);
-        throw error;
+        retryCount++;
+        console.log(`⚠️ Attempt ${retryCount} failed: ${error.message}`);
+        if (retryCount < maxRetries) {
+          console.log(`🔄 Retrying in 1 second...`);
+          await page.waitForTimeout(1000);
+        } else {
+          console.error('❌ Failed to click signout button after multiple attempts');
+          throw error;
+        }
       }
-    } else {
-      console.error('❌ Signout button not found');
-      await browser.close();
     }
+
+    // If we got here, the button was successfully clicked
+    console.log('✅ Signout button found and clicked successfully');
+
+    // Wait for any post-signout actions
+    await page.waitForTimeout(3000);
 
     // Wait for signout confirmation
     await page.waitForNavigation({ waitUntil: 'networkidle0', timeout: config.TIMEOUTS.NAVIGATION });
@@ -163,7 +158,6 @@ async function signOutAdrenalin() {
 
     // Close browser gracefully
     await browser.close();
-
   } catch (error) {
     console.error('❌ Error during login:', error);
     if (browser) {
@@ -175,7 +169,7 @@ async function signOutAdrenalin() {
     }
     throw error;
   }
-  
+
   return { browser: null, page: null, loggedIn: true };
 }
 
