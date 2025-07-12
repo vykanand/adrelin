@@ -4,8 +4,28 @@
 const puppeteer = require('puppeteer');
 const config = require('./config');
 
-// Sign Out functionality
+// Sign Out functionality with daily check
 async function signOutAdrenalin() {
+  // Check if we've already signed out today
+  const today = new Date().toISOString().split('T')[0];
+  const lastSignoutFile = './last_signout.txt';
+  
+  try {
+    const lastSignoutDate = await page.evaluate(() => {
+      try {
+        return fs.readFileSync(lastSignoutFile, 'utf8');
+      } catch (e) {
+        return null;
+      }
+    });
+    
+    if (lastSignoutDate === today) {
+      console.log('✅ Already signed out today - skipping');
+      return { browser: null, page: null, loggedIn: false };
+    }
+  } catch (error) {
+    console.warn('⚠️ Could not check last signout date:', error);
+  }
   let browser;
   try {
     browser = await puppeteer.launch(config.LAUNCH_OPTIONS);
@@ -108,20 +128,41 @@ async function signOutAdrenalin() {
           throw new Error('Button is not clickable');
         }
 
-        // Click the button
+        // Click the button with proper waiting
         console.log('🚀 Clicking signout button...');
         await page.evaluate((selector) => {
           const button = document.querySelector(selector);
           if (button) {
-            button.click();
+            // Wait for button to be ready
+            const observer = new MutationObserver((mutations) => {
+              mutations.forEach(mutation => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'disabled') {
+                  if (!button.disabled) {
+                    button.click();
+                    observer.disconnect();
+                  }
+                }
+              });
+            });
+            
+            // Start observing disabled attribute
+            observer.observe(button, { attributes: true });
+            
+            // Initial check
+            if (!button.disabled) {
+              button.click();
+              observer.disconnect();
+            }
           }
         }, signoutButtonSelector);
 
-        // Wait for the click to take effect
-        await page.waitForTimeout(1000);
+        // Wait for button click effects with more robust waiting
+        await page.waitForSelector('.swal2-modal', { timeout: config.TIMEOUTS.ELEMENT_WAIT });
+        console.log('✅ Signout button click detected');
         buttonClicked = true;
 
-        console.log('✅ Successfully clicked signout button');
+        // Wait for any post-signout actions
+        await page.waitForTimeout(2000);
 
       } catch (error) {
         retryCount++;
@@ -158,6 +199,15 @@ async function signOutAdrenalin() {
 
     // Close browser gracefully
     await browser.close();
+
+    // Record successful signout for today
+    await page.evaluate((today) => {
+      try {
+        fs.writeFileSync(lastSignoutFile, today);
+      } catch (e) {
+        console.warn('⚠️ Could not record signout date:', e);
+      }
+    }, today);
   } catch (error) {
     console.error('❌ Error during login:', error);
     if (browser) {
