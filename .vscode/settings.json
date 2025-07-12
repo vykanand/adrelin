@@ -1,3 +1,6 @@
 {
-    "zencoder.enableRepoIndexing": true
+    "zencoder.enableRepoIndexing": true,
+    "conventionalCommits.scopes": [
+        "fix timeouts"
+    ]
 }
