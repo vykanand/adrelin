@@ -1,8 +1,46 @@
 FROM node:18-slim as builder
 
-# Install Chrome and unzip
-RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y \
+# Install required system dependencies
+RUN apt-get update && apt-get install -y \
+    wget \
+    gnupg \
     unzip \
+    ca-certificates \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libc6 \
+    libcairo2 \
+    libcups2 \
+    libdbus-1-3 \
+    libexpat1 \
+    libfontconfig1 \
+    libgbm1 \
+    libgcc1 \
+    libglib2.0-0 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libx11-6 \
+    libx11-xcb1 \
+    libxcb1 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxi6 \
+    libxrandr2 \
+    libxrender1 \
+    libxss1 \
+    libxtst6 \
+    lsb-release \
+    xdg-utils \
+    xvfb \
+    --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -27,36 +65,52 @@ RUN echo "=== Verifying node_modules ===" && \
 COPY . .
 
 # Build final image
-FROM selenium/standalone-chrome:latest
+FROM node:18-slim
+
+# Install Chrome
+RUN apt-get update && apt-get install -y \
+    wget \
+    gnupg \
+    --no-install-recommends \
+    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update \
+    && apt-get install -y google-chrome-stable \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set timezone environment variable
 ENV TZ=Asia/Kolkata
 
-# Set environment variables for Chrome
-ENV CHROME_BIN=/usr/bin/google-chrome
-ENV CHROME_FLAGS="--headless --no-sandbox --disable-dev-shm-usage --disable-gpu"
-
-# Copy Node.js installation from builder
-COPY --from=builder /usr/local /usr/local
-
-# Set working directory and copy application
+# Set environment variables for Chrome and Puppeteer
+ENV CHROME_PATH=/usr/bin/google-chrome
+ENV CHROME_DEVEL_SANDBOX=/usr/bin/google-chrome
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome
 ENV DISPLAY=:99
 
-# Copy application from builder
+# Copy Node.js installation from builder
+COPY --from=builder /usr/local /usr/local
+
+# Create app directory
 WORKDIR /app
+
+# Copy application files
 COPY --from=builder /app/ .
 
-# Debug: Verify node_modules in final image
-RUN echo "=== Verifying node_modules in final image ===" && \
-    echo "1. Check node_modules directory:" && \
-    ls -la node_modules/ && \
-    echo "\n2. Check puppeteer package:" && \
-    ls -la node_modules/puppeteer && \
-    echo "\n3. Check puppeteer package.json:" && \
-    cat node_modules/puppeteer/package.json | grep version
+# Create a non-root user and switch to it
+RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
+    && mkdir -p /home/pptruser/Downloads \
+    && chown -R pptruser:pptruser /home/pptruser \
+    && chown -R pptruser:pptruser /app
 
-# Expose port and start the application
-EXPOSE 3000
+# Run everything after as non-privileged user
+USER pptruser
+
+# Expose the app port (if needed)
+
+# Install production dependencies
+RUN npm install --production
+
+# Command to run the application
 CMD ["node", "server.js"]

@@ -10,13 +10,19 @@ module.exports = {
     
     // Browser launch options
     LAUNCH_OPTIONS: {
-        headless: true,
+        headless: 'new', // Use new headless mode
+        defaultViewport: null,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-gpu',
-            '--window-size=1920,1080'
+            '--disable-software-rasterizer',
+            '--disable-web-security',
+            '--disable-features=IsolateOrigins,site-per-process',
+            '--window-size=1920,1080',
+            '--single-process',
+            '--no-zygote'
         ]
     },
     

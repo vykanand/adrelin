@@ -41,23 +41,13 @@ async function signOutAdrenalin() {
   try {
     console.log('\n=== Starting Sign Out Process ===');
     
-    // Launch browser
-    browser = await puppeteer.launch({
-      ...config.LAUNCH_OPTIONS,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      headless: false, // Set to true for production
-      ignoreHTTPSErrors: true
-    });
-
+    // Launch browser with the same configuration as signin.js
+    console.log('🌐 Launching browser...');
+    browser = await puppeteer.launch(config.LAUNCH_OPTIONS);
     const page = await browser.newPage();
     
-    // Set default navigation timeout
-    page.setDefaultNavigationTimeout(config.TIMEOUTS.PAGE_LOAD);
-    page.setDefaultTimeout(config.TIMEOUTS.ELEMENT_WAIT);
-    
-    // Set viewport and user agent
+    // Set viewport from config
     await page.setViewport(config.VIEWPORT);
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
     
     console.log(`🌐 Navigating to: ${config.URL}`);
     await page.goto(config.URL, { 
@@ -65,11 +55,11 @@ async function signOutAdrenalin() {
       timeout: config.TIMEOUTS.PAGE_LOAD 
     });
 
-    // Wait for page to be fully loaded
-    await page.waitForFunction(
-      () => document.readyState === 'complete',
-      { timeout: config.TIMEOUTS.ELEMENT_WAIT }
-    );
+    // Wait for page to be fully loaded and theme to be applied
+    await page.waitForFunction(() => {
+      return document.readyState === 'complete' && 
+             document.querySelector('html').style.opacity === '1';
+    }, { timeout: config.TIMEOUTS.ELEMENT_WAIT });
 
     // Check if already logged in
     const isLoggedIn = await page.evaluate(() => {
