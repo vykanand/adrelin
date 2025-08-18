@@ -6,24 +6,34 @@ const { sendEmail } = require('./email');
 async function startServer() {
     console.log('Starting Adrenalin Automation Server...');
     
-    // Function to get next scheduled time
+    // Function to get next scheduled time (weekdays only)
     function getNextScheduledTime(isSignIn) {
         const now = new Date();
         const nextTime = new Date(now);
         
         // Get current day of week (0=Sunday, 1=Monday, etc)
         const currentDay = now.getDay();
+        let daysToAdd = 0;
         
-        // Calculate days until next weekday (Monday to Friday)
+        // Handle weekends and after-hours
         if (currentDay === 6) { // Saturday
-            nextTime.setDate(now.getDate() + 2); // Skip to Monday
+            daysToAdd = 2; // Skip to Monday
         } else if (currentDay === 0) { // Sunday
-            nextTime.setDate(now.getDate() + 1); // Skip to Monday
+            daysToAdd = 1; // Skip to Monday
         } else if (currentDay === 5) { // Friday
-            // If it's Friday and after 9:20 AM, skip to Monday
-            if (now.getHours() >= 9 && (now.getHours() > 9 || now.getMinutes() >= 20)) {
-                nextTime.setDate(now.getDate() + 3); // Skip to Monday
+            // If it's Friday and after work hours, skip to Monday
+            if (now.getHours() >= 18 || (now.getHours() >= 17 && now.getMinutes() >= 0)) {
+                daysToAdd = 3; // Skip to Monday
             }
+        } else if (now.getHours() >= 18 || (now.getHours() >= 17 && now.getMinutes() >= 0)) {
+            // If it's a weekday but after work hours, schedule for next day
+            daysToAdd = currentDay === 4 ? 3 : 1; // If Friday, skip to Monday
+        }
+        
+        // Adjust the date if needed
+        if (daysToAdd > 0) {
+            nextTime.setDate(now.getDate() + daysToAdd);
+            nextTime.setHours(9, 0, 0, 0); // Reset to 9 AM
         }
         
         // Set time to 9:00 AM for sign-in
