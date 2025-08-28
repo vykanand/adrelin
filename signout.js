@@ -1,11 +1,15 @@
-// Install with:
-// npm install puppeteer
-
 const puppeteer = require('puppeteer');
 const config = require('./config');
 
-// Utility function to safely click an element
-async function safeClick(page, selector, description, timeout = config.TIMEOUTS.ELEMENT_WAIT) {
+/**
+ * Safely clicks an element on the page with proper error handling and logging
+ * @param {Page} page - Puppeteer page object
+ * @param {string} selector - CSS selector for the element to click
+ * @param {string} description - Human-readable description of the element
+ * @param {number} [timeout=30000] - Maximum time to wait for the element
+ * @returns {Promise<boolean>} True if click was successful, false otherwise
+ */
+async function safeClick(page, selector, description, timeout = config.TIMEOUTS?.ELEMENT_WAIT || 30000) {
   try {
     console.log(`🔍 Looking for: ${description} (${selector})`);
     await page.waitForSelector(selector, { 
@@ -34,7 +38,10 @@ async function safeClick(page, selector, description, timeout = config.TIMEOUTS.
   }
 }
 
-// Function to clean up browser resources
+/**
+ * Cleans up browser resources including all pages and the browser instance
+ * @param {Browser} browser - Puppeteer browser instance to clean up
+ */
 async function cleanupBrowser(browser) {
   if (!browser) return;
   
@@ -43,53 +50,68 @@ async function cleanupBrowser(browser) {
     for (const page of pages) {
       try {
         await page.close();
-      } catch (e) { /* ignore */ }
+      } catch (e) {
+        console.error('Error closing page:', e.message);
+      }
     }
     await browser.close();
     console.log('🔒 Browser and all pages closed');
-  } catch (closeError) {
-    console.error('❌ Error during browser cleanup:', closeError.message);
+  } catch (error) {
+    console.error('Error during browser cleanup:', error.message);
   }
 }
 
-// Main sign out function
+/**
+ * Main function to sign out from the application
+ * @returns {Promise<Object>} Result object with success status and message
+ */
 async function signOutAdrenalin() {
   let browser;
+  let page;
   const maxRetries = 2;
   let retryCount = 0;
 
   while (retryCount < maxRetries) {
-    let page;
-    let context;
-    
     try {
       console.log('\n=== Starting Sign Out Process ===');
       
-      // Launch browser
+      // Launch browser with consistent options
       console.log('🌐 Launching browser...');
-      browser = await puppeteer.launch({
+      const launchOptions = {
         ...config.LAUNCH_OPTIONS,
-        headless: false, // Set to true for production
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-      });
+        headless: 'new',
+        args: [
+          ...(config.LAUNCH_OPTIONS?.args || []),
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--single-process',
+          '--no-zygote'
+        ]
+      };
+
+      console.log('Browser launch options:', JSON.stringify(launchOptions, null, 2));
+      browser = await puppeteer.launch(launchOptions);
       
-      context = await browser.createIncognitoBrowserContext();
+      const context = await browser.createIncognitoBrowserContext();
       page = await context.newPage();
       
-      // Set viewport from config
-      await page.setViewport(config.VIEWPORT);
-      page.setDefaultTimeout(30000);
+      // Set viewport and timeouts
+      await page.setViewport(config.VIEWPORT || { width: 1920, height: 1080 });
+      page.setDefaultTimeout(config.TIMEOUTS?.PAGE_LOAD || 60000);
       await page.setCacheEnabled(false);
       
       console.log(`🌐 Navigating to: ${config.URL}`);
       await page.goto(config.URL, { 
         waitUntil: 'domcontentloaded',
-        timeout: 60000,
-        referer: 'https://www.google.com/'
+        timeout: config.TIMEOUTS?.PAGE_LOAD || 60000
       });
 
       // Wait for page to be fully loaded
-      await page.waitForFunction(() => document.readyState === 'complete', { timeout: 30000 });
+      await page.waitForFunction(() => document.readyState === 'complete', { 
+        timeout: config.TIMEOUTS?.PAGE_LOAD || 30000 
+      });
 
       // Check if already on login page
       const isLoginPage = await page.evaluate(() => !!document.querySelector('input#txtID'));
@@ -109,25 +131,16 @@ async function signOutAdrenalin() {
 
       console.log('✅ User is logged in, proceeding with sign out...');
       await page.waitForTimeout(2000);
-      await page.screenshot({ path: 'before-signout.png' });
       
       // Try to find and click the dropdown toggle
       console.log('🔍 Step 1: Clicking dropdown toggle button...');
       try {
-        await page.waitForSelector('a.dropdown-toggle.down_sign_popup', { 
-          visible: true, 
-          timeout: 10000 
-        });
-        
-        await page.evaluate(() => {
-          const dropdown = document.querySelector('a.dropdown-toggle.down_sign_popup');
-          if (dropdown) {
-            dropdown.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            dropdown.click();
-          }
-        });
-        
-        console.log('✅ Dropdown toggle clicked');
+        await safeClick(
+          page, 
+          'a.dropdown-toggle.down_sign_popup', 
+          'User Dropdown Toggle',
+          config.TIMEOUTS?.ELEMENT_WAIT || 10000
+        );
       } catch (error) {
         console.warn('⚠️ Could not find dropdown toggle, trying direct sign out button...');
       }
@@ -135,20 +148,12 @@ async function signOutAdrenalin() {
       // Try to find and click the Sign Out button
       console.log('🔍 Step 2: Clicking "Sign Me Out" button...');
       try {
-        await page.waitForSelector('button[apptxt="FXPR_MPPG_SIGNOUT"]', { 
-          visible: true, 
-          timeout: 10000 
-        });
-        
-        await page.evaluate(() => {
-          const signOutButton = document.querySelector('button[apptxt="FXPR_MPPG_SIGNOUT"]');
-          if (signOutButton) {
-            signOutButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            signOutButton.click();
-          }
-        });
-        
-        console.log('✅ "Sign Me Out" button clicked');
+        await safeClick(
+          page,
+          'button[apptxt="FXPR_MPPG_SIGNOUT"]',
+          'Sign Out Button',
+          config.TIMEOUTS?.ELEMENT_WAIT || 10000
+        );
       } catch (error) {
         console.warn('⚠️ Could not find sign out button, checking if already signed out...');
         if (await page.$('input#txtID')) {
@@ -162,17 +167,12 @@ async function signOutAdrenalin() {
       // Handle SweetAlert confirmation if it appears
       console.log('🔍 Step 3: Checking for confirmation dialog...');
       try {
-        await page.waitForSelector('button.swal2-confirm', { 
-          visible: true, 
-          timeout: 5000 
-        });
-        
-        await page.evaluate(() => {
-          const okButton = document.querySelector('button.swal2-confirm');
-          if (okButton) okButton.click();
-        });
-        
-        console.log('✅ Confirmation dialog handled');
+        await safeClick(
+          page,
+          'button.swal2-confirm',
+          'Confirmation Dialog OK Button',
+          config.TIMEOUTS?.ELEMENT_WAIT || 5000
+        );
       } catch (error) {
         console.log('ℹ️ No confirmation dialog found, continuing...');
       }
@@ -180,67 +180,30 @@ async function signOutAdrenalin() {
       // Wait for sign out to complete
       console.log('🔄 Step 4: Waiting for sign out to complete...');
       try {
-        // Wait for any navigation to complete
         await page.waitForNavigation({ 
           waitUntil: 'domcontentloaded', 
-          timeout: 15000 
+          timeout: config.TIMEOUTS?.PAGE_LOAD || 15000 
         });
         
-        // Get the current URL after navigation
-        const currentUrl = page.url();
-        console.log(`🔗 Current URL after signout: ${currentUrl}`);
-        
-        // Check if we're on a different page than before (indicating successful signout)
-        if (currentUrl !== config.URL) {
-          console.log(`✅ Sign out successful - Redirected to: ${currentUrl}`);
-          await cleanupBrowser(browser);
-          return { 
-            success: true, 
-            message: 'Sign out completed successfully',
-            redirectedTo: currentUrl
-          };
-        }
-        
-        // If URL didn't change, check for absence of user elements
-        const isSignedOut = await page.evaluate(() => {
-          const userElements = document.querySelectorAll('p.user_name, .user-profile, .user-menu');
-          return userElements.length === 0;
-        });
-        
+        // Verify successful sign out by checking for login form
+        const isSignedOut = await page.evaluate(() => !!document.querySelector('input#txtID'));
         if (isSignedOut) {
-          console.log('✅ Sign out successful - User session ended');
+          console.log('✅ Sign out successful - Login form detected');
           await cleanupBrowser(browser);
           return { 
             success: true, 
-            message: 'Sign out completed successfully',
-            sessionEnded: true
+            message: 'Successfully signed out',
+            redirectedTo: page.url()
           };
         }
         
-        // Additional verification steps
-        console.warn('⚠️ Could not verify signout through URL or session state, checking login page...');
-        await page.screenshot({ path: 'after-signout.png' });
-        
-        // Check if we're on the login page as a fallback
-        const isOnLoginPage = await page.evaluate(() => !!document.querySelector('input#txtID'));
-        
-        if (isOnLoginPage) {
-          console.log('✅ Sign out successful - on login page');
-          await cleanupBrowser(browser);
-          return { 
-            success: true, 
-            message: 'Sign out completed successfully',
-            onLoginPage: true
-          };
-        }
-        
-        // Final check for user elements
-        const userElements = await page.evaluate(() => 
+        // Additional verification: Check for absence of user elements
+        const userElementsCount = await page.evaluate(() => 
           document.querySelectorAll('p.user_name, .user-profile, .user-menu').length
         );
         
-        if (userElements === 0) {
-          console.log('✅ Sign out successful - no user elements found');
+        if (userElementsCount === 0) {
+          console.log('✅ Sign out successful - No user elements found');
           await cleanupBrowser(browser);
           return { 
             success: true, 
@@ -249,21 +212,28 @@ async function signOutAdrenalin() {
           };
         }
         
-        throw new Error('Could not verify successful signout');
+        // If we get here, verification failed
+        throw new Error('Could not verify successful sign out');
         
       } catch (navError) {
         console.warn('⚠️ Navigation timeout, checking current state...');
+        
+        // Take a screenshot for debugging
         await page.screenshot({ path: 'after-signout.png' });
         
-        // Check if we're already on the login page
+        // Final verification attempts
         const isOnLoginPage = await page.evaluate(() => !!document.querySelector('input#txtID'));
-        
         if (isOnLoginPage) {
-          console.log('✅ Sign out successful - on login page');
+          console.log('✅ Sign out successful - On login page after navigation timeout');
           await cleanupBrowser(browser);
-          return { success: true, message: 'Sign out completed successfully' };
+          return { 
+            success: true, 
+            message: 'Sign out completed successfully',
+            onLoginPage: true
+          };
         }
         
+        // If we can't verify sign out, throw the original error
         throw navError;
       }
       
@@ -278,13 +248,20 @@ async function signOutAdrenalin() {
       }
       
       console.log(`🔄 Retrying... (${retryCount}/${maxRetries})`);
-      if (browser) await cleanupBrowser(browser);
+      
+      // Clean up before retry
+      if (browser) {
+        await cleanupBrowser(browser);
+        browser = null;
+      }
+      
+      // Add a small delay before retry
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
   }
   
-  return { success: false, message: 'Unexpected error in sign out process' };
+  return { success: false, message: 'Failed to sign out after multiple attempts' };
 }
 
 // Export the function
-module.exports.signOutAdrenalin = signOutAdrenalin;
+module.exports = { signOutAdrenalin };
